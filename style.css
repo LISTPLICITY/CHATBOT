@@ -77,3 +77,20 @@ main { width: 100%; max-width: 980px; padding: 20px; }
   .in { padding:10px; }
   .send { padding:0 14px; }
 }
+/* ---- iOS safe-area padding (notch/home bar) ---- */
+@supports (padding: max(0px)) {
+  @media (max-width:640px) {
+    .chat-container {
+      min-height: calc(100vh + env(safe-area-inset-bottom));
+    }
+    .brand {
+      padding-top: max(12px, env(safe-area-inset-top));
+    }
+    .chat-messages {
+      padding-bottom: max(14px, calc(14px + env(safe-area-inset-bottom) / 2));
+    }
+    .compose {
+      padding-bottom: max(10px, calc(10px + env(safe-area-inset-bottom)));
+    }
+  }
+}
