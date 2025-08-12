@@ -94,3 +94,27 @@ main { width: 100%; max-width: 980px; padding: 20px; }
     }
   }
 }
+/* ---- Prevent iOS zoom on input focus ---- */
+@media (max-width:640px) {
+  input.in {
+    font-size: 16px; /* iOS zoom prevention */
+  }
+}
+
+/* ---- Prevent layout jump when keyboard opens ---- */
+html, body {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+.chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
