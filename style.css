@@ -78,16 +78,24 @@ main { width: 100%; max-width: 980px; padding: 20px; }
   main { padding: 0; max-width: 100%; }
   .brand { padding: 12px; margin-bottom: 0; }
 
+  /* Use dynamic viewport so the box adjusts when keyboard opens */
   .chat-container{
-    height:100vh;           /* full height */
-    max-width:100%;         /* full width */
-    border-radius:0;        /* edge-to-edge */
-    box-shadow:none;        /* flush with edges */
+    height: 100dvh;
+    max-height: 100dvh;
+    max-width:100%;
+    border-radius:0;
+    box-shadow:none;
   }
 
-  .chat-messages { padding:14px; }
+  .chat-messages {
+    padding:14px;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior: contain;
+  }
+
   .compose { padding:10px; gap:8px; }
-  .in { padding:10px; }
+  .in { padding:10px; font-size:16px; }  /* >=16px prevents iOS zoom */
   .send { padding:0 14px; }
 }
 
@@ -96,10 +104,6 @@ main { width: 100%; max-width: 980px; padding: 20px; }
    ------------------------------------------- */
 @supports (padding: max(0px)) {
   @media (max-width:640px) {
-    .chat-container {
-      /* extend for bottom inset so nothing hides behind the home bar */
-      min-height: calc(100vh + env(safe-area-inset-bottom));
-    }
     .brand {
       padding-top: max(12px, env(safe-area-inset-top));
     }
@@ -109,26 +113,5 @@ main { width: 100%; max-width: 980px; padding: 20px; }
     .compose {
       padding-bottom: max(10px, calc(10px + env(safe-area-inset-bottom)));
     }
-  }
-}
-
-/* -------------------------------------------------
-   Prevent iOS Safari zoom-on-focus & layout jumping
-   ------------------------------------------------- */
-@media (max-width:640px) {
-  /* iOS zoom prevention: inputs must be >= 16px */
-  input.in { font-size: 16px; }
-
-  /* Keep layout stable when keyboard opens */
-  html, body { height: 100%; -webkit-text-size-adjust: 100%; }
-  body {
-    position: fixed;        /* prevent viewport from shifting */
-    width: 100%;
-    overflow: hidden;       /* page itself doesn't scroll; messages do */
-  }
-  .chat-container {
-    height: 100%;           /* fill the screen under fixed body */
-    display: flex;
-    flex-direction: column;
   }
 }
