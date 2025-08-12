@@ -1,111 +1,98 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Listplicity Chatbot</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    header {
-      background: #222;
-      color: #fff;
-      padding: 15px;
-      text-align: center;
-      font-size: 1.2em;
-    }
-    #chat-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      max-width: 600px;
-      margin: auto;
-      background: #fff;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-    }
-    #messages {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-      border-bottom: 1px solid #ccc;
-    }
-    .message {
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: 8px;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-    .user {
-      background: #007bff;
-      color: white;
-      align-self: flex-end;
-    }
-    .bot {
-      background: #f1f1f1;
-      align-self: flex-start;
-    }
-    #input-area {
-      display: flex;
-      padding: 10px;
-      background: #f9f9f9;
-    }
-    #input {
-      flex: 1;
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    button {
-      padding: 10px 15px;
-      border: none;
-      background: #007bff;
-      color: white;
-      border-radius: 5px;
-      margin-left: 10px;
-      cursor: pointer;
-    }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      padding: 10px;
-      background: #fafafa;
-      border-bottom: 1px solid #ccc;
-    }
-    .chip {
-      background: #eee;
-      padding: 8px 12px;
-      margin: 5px;
-      border-radius: 16px;
-      cursor: pointer;
-      font-size: 0.9em;
-    }
-    .chip:hover {
-      background: #ddd;
-    }
-  </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Listplicity Assistant</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css"/>
+
+  <!-- Favicons (optional) -->
+  <link rel="icon" href="data:,">
 </head>
 <body>
-  <header>Welcome to Listplicity — Let’s Get Started</header>
-  <div id="chat-container">
-    <div class="chips" id="quick-prompts"></div>
-    <div id="messages"></div>
-    <div id="input-area">
-      <input type="text" id="input" placeholder="Type your message..." />
-      <button onclick="sendMessage()">Send</button>
-    </div>
+  <div class="page">
+    <main>
+      <header class="brand">
+        <div class="logo">L</div>
+        <div>
+          <h1>Listplicity Assistant</h1>
+          <p class="sub">Real-time help • MLS access • 1% Listing (Limited Services)</p>
+        </div>
+      </header>
+
+      <!-- Chat widget -->
+      <section class="chat-container" role="dialog" aria-label="Listplicity Chat">
+        <div class="head">
+          <div class="logo small">L</div>
+          <div>
+            <div class="title">We’re glad you’re here</div>
+            <div class="subtle">Ask anything — I’ll also get you set up fast.</div>
+          </div>
+        </div>
+
+        <div class="bar"><div id="pbar"></div></div>
+
+        <!-- Scrollable messages -->
+        <div class="chat-messages" id="log" aria-live="polite"></div>
+
+        <!-- Composer -->
+        <div class="compose">
+          <input id="in" class="in" placeholder="Type your message… (Enter)" autocomplete="off"/>
+          <button id="send" class="send" aria-label="Send message">Send</button>
+        </div>
+
+        <!-- Quick prompts -->
+        <div id="chips" class="choices" aria-label="Quick prompts"></div>
+      </section>
+    </main>
   </div>
 
   <script>
+  (function(){
+    const API = window.location.origin;
+    const log = document.getElementById('log');
+    const pbar = document.getElementById('pbar');
+    const input = document.getElementById('in');
+    const send = document.getElementById('send');
+    const chips = document.getElementById('chips');
+
+    const transcript = []; // [{role:'user'|'assistant', content:string}]
+    const state = { path:null, answers:{}, intent:null };
+    let ctaOnce = false; // ensure we only render the MLS CTA once
+
+    // ----- UI helpers
+    function add(role, text, cta){
+      const row = document.createElement('div');
+      row.className = 'row' + (role==='me' ? ' me' : '');
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      b.textContent = text || '';
+      if (cta && !ctaOnce && cta.href && cta.label){
+        const wrap = document.createElement('div');
+        wrap.className = 'cta-wrap';
+        const a = document.createElement('a');
+        a.className = 'cta';
+        a.href = cta.href; a.target = '_blank'; a.rel='noopener';
+        a.textContent = cta.label;
+        wrap.appendChild(a);
+        b.appendChild(wrap);
+        ctaOnce = true;
+      }
+      row.appendChild(b);
+      log.appendChild(row);
+      // autoscroll
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function progress(){
+      const req = ['path','name','email','phone'];
+      const have = req.filter(k => k==='path' ? !!state.path : !!state.answers[k]);
+      pbar.style.width = Math.round(have.length/req.length*100) + '%';
+    }
+
+    // ----- Quick prompts
     const BASE_PROMPTS = [
       'Sell My Home',
       'Buy a Home',
@@ -113,61 +100,128 @@
       'Get MLS access',
       'Get a Custom CMA Report'
     ];
-
     const BUY_PROMPTS = [
       'I want MLS access',
+      'Homes in Fredericksburg',
+      'My budget is 500k',
+      'I am / not preapproved',
+      'Get a Custom CMA Report'
     ];
-
     const SELL_PROMPTS = [
       'I want a home valuation',
+      'My address is …',
+      'My timeline is …',
       'Tell me about the 1% listing',
+      'Get a Custom CMA Report'
     ];
 
-    const messagesEl = document.getElementById('messages');
-    const inputEl = document.getElementById('input');
-    const quickPromptsEl = document.getElementById('quick-prompts');
+    function renderChips(){
+      let items = BASE_PROMPTS.slice(0);
+      if (state.path === 'buy') items = BUY_PROMPTS;
+      if (state.path === 'sell') items = SELL_PROMPTS;
 
-    function addMessage(text, sender) {
-      const div = document.createElement('div');
-      div.classList.add('message', sender);
-      div.innerText = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    function sendMessage(text = null) {
-      const msg = text || inputEl.value.trim();
-      if (!msg) return;
-      addMessage(msg, 'user');
-      inputEl.value = '';
-
-      fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg })
-      })
-      .then(res => res.json())
-      .then(data => {
-        addMessage(data.response || 'Sorry, something went wrong.', 'bot');
-      })
-      .catch(err => {
-        console.error(err);
-        addMessage('Error contacting server.', 'bot');
+      chips.innerHTML = '';
+      items.forEach(txt=>{
+        const c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'chip';
+        c.textContent = txt;
+        c.addEventListener('click', ()=> handleUser(txt, true));
+        chips.appendChild(c);
       });
     }
 
-    function loadPrompts(prompts) {
-      quickPromptsEl.innerHTML = '';
-      prompts.forEach(prompt => {
-        const chip = document.createElement('div');
-        chip.classList.add('chip');
-        chip.innerText = prompt;
-        chip.onclick = () => sendMessage(prompt);
-        quickPromptsEl.appendChild(chip);
-      });
+    // ----- Data flow
+    async function welcome(){
+      try{
+        const r = await fetch(API + '/api/welcome');
+        const data = await r.json();
+        add('bot', data.bot_text || 'Welcome to Listplicity! How can I help?');
+      }catch{
+        add('bot','Welcome to Listplicity! How can I help?');
+      }
+      progress();
+      renderChips();
     }
 
-    loadPrompts(BASE_PROMPTS);
+    async function talk(){
+      try{
+        const payload = { history: transcript.slice(-12), state };
+        const r = await fetch(API + '/api/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+
+        if (data.state_patch?.path) state.path = data.state_patch.path;
+        if (data.state_patch?.answers) Object.assign(state.answers, data.state_patch.answers);
+        if (data.state_patch?.tag) state.tag = data.state_patch.tag;
+
+        add('bot', data.bot_text || 'Okay.', data.cta || null);
+        transcript.push({ role:'assistant', content: data.bot_text || ''});
+        progress();
+        renderChips();
+
+        if (data.action === 'submit') await submitLead();
+      }catch(e){
+        add('bot','I hit a snag—mind trying again?');
+        console.error(e);
+      } finally {
+        // Keep CMA steering for next turn only
+        if (state.intent !== 'cma_request') state.intent = null;
+      }
+    }
+
+    async function submitLead(){
+      add('bot','Sending this over now…');
+      try{
+        const r = await fetch(API + '/api/lead', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            path: state.path,
+            answers: state.answers,
+            tag: state.tag || null,
+            ts: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          })
+        });
+        if(!r.ok) throw new Error();
+        add('bot','Done ✅ We’ll follow up shortly. Want to book a quick call while I have you?');
+        pbar.style.width='100%';
+      }catch{
+        add('bot','Couldn’t send just now — mind sharing your number/email and I’ll make sure it goes through?');
+      }
+    }
+
+    function handleUser(v, fromChip = false){
+      const text = (v||'').trim();
+      if (!text) return;
+
+      // If they clicked "Get a Custom CMA Report", hint the backend to run CMA flow
+      if (fromChip && /custom cma report/i.test(text)) {
+        state.intent = 'cma_request';
+      }
+      // If they clicked "Get MLS access", hint buyer flow immediately
+      if (fromChip && /get mls access/i.test(text)) {
+        state.path = state.path || 'buy'; // steer into buyer path
+      }
+
+      add('me', text);
+      transcript.push({ role:'user', content: text });
+      input.value='';
+      talk();
+    }
+
+    send.addEventListener('click', ()=> handleUser(input.value));
+    input.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); handleUser(input.value); }
+    });
+
+    // Kickoff
+    welcome();
+  })();
   </script>
 </body>
 </html>
