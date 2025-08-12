@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Listplicity Assistant</title>
+  <link rel="stylesheet" href="./style.css"/>
+  <style>
+    .choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .chip{padding:8px 12px;font-size:14px;border-radius:999px;background:#0f1317;color:#f7f7f7;border:1px solid #323944;cursor:pointer}
+    .chip:hover{border-color:#46505c}
+    .cta-wrap{margin-top:10px}
+    .cta{display:inline-block;padding:10px 14px;border-radius:12px;background:linear-gradient(180deg,#d4af37,#f7d774);color:#111;text-decoration:none;font-weight:800;box-shadow:0 8px 22px rgba(212,175,55,.2)}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <div class="logo">L</div>
+      <div>
+        <h1>Listplicity Assistant</h1>
+        <p class="sub">Friendly, real-time help · MLS access & 1% Listing (Limited Services)</p>
+      </div>
+    </div>
+
+    <div class="card" role="dialog" aria-label="Listplicity Chat">
+      <div class="head">
+        <div class="logo" style="width:32px;height:32px;border-radius:10px;font-size:14px">L</div>
+        <div>
+          <div class="title">We’re glad you’re here</div>
+          <div class="subtle">Ask anything — I’ll also get you set up fast.</div>
+        </div>
+      </div>
+      <div class="bar"><div id="pbar"></div></div>
+      <div class="body" id="log" aria-live="polite"></div>
+      <div class="compose">
+        <input id="in" class="in" placeholder="Type your message… (Enter)" autocomplete="off"/>
+        <button id="send" class="send">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+  (function(){
+    const API = window.location.origin;
+    const log = document.getElementById('log');
+    const pbar = document.getElementById('pbar');
+    const input = document.getElementById('in');
+    const send = document.getElementById('send');
+
+    const transcript = [];
+    const state = { path:null, answers:{} };
+
+    function add(role, text, cta){
+      const row = document.createElement('div');
+      row.className = 'row' + (role==='me' ? ' me' : '');
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      b.textContent = text || '';
+      if (cta && cta.href && cta.label){
+        const wrap = document.createElement('div');
+        wrap.className = 'cta-wrap';
+        const a = document.createElement('a');
+        a.className = 'cta';
+        a.href = cta.href;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = cta.label;
+        wrap.appendChild(a);
+        b.appendChild(wrap);
+      }
+      row.appendChild(b);
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+    function progress(){
+      const req = ['path','name','email','phone'];
+      const have = req.filter(k => k==='path' ? !!state.path : !!state.answers[k]);
+      pbar.style.width = Math.round(have.length/req.length*100) + '%';
+    }
+
+    async function welcome(){
+      try{
+        const r = await fetch(API + '/api/welcome');
+        const data = await r.json();
+        add('bot', data.bot_text);
+      }catch{ add('bot','Welcome to Listplicity! How can I help?'); }
+      progress();
+    }
+
+    async function talk(){
+      try{
+        const payload = { history: transcript.slice(-12), state };
+        const r = await fetch(API + '/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        const data = await r.json();
+
+        if (data.state_patch?.path) state.path = data.state_patch.path;
+        if (data.state_patch?.answers) Object.assign(state.answers, data.state_patch.answers);
+        if (data.state_patch?.tag) state.tag = data.state_patch.tag;
+
+        add('bot', data.bot_text || 'Okay.', data.cta || null);
+        transcript.push({ role:'assistant', content: data.bot_text || ''});
+        progress();
+
+        if (data.action === 'submit') await submitLead();
+      }catch(e){
+        add('bot','I hit a snag—mind trying again?');
+        console.error(e);
+      }
+    }
+
+    async function submitLead(){
+      add('bot','Sending this over now…');
+      try{
+        const r = await fetch(API + '/api/lead', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            path: state.path, answers: state.answers, tag: state.tag || null,
+            ts: new Date().toISOString(), userAgent: navigator.userAgent
+          })
+        });
+        if(!r.ok) throw new Error();
+        add('bot','Done ✅ We’ll follow up shortly. Want to book a quick call while I have you?');
+        pbar.style.width='100%';
+      }catch{ add('bot','Couldn’t send just now — mind sharing your number/email and I’ll make sure it goes through?'); }
+    }
+
+    function handleUser(v){
+      const text = (v||'').trim();
+      if (!text) return;
+      add('me', text);
+      transcript.push({ role:'user', content: text });
+      input.value='';
+      talk();
+    }
+
+    send.addEventListener('click', ()=> handleUser(input.value));
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); handleUser(input.value); }});
+
+    welcome();
+  })();
+  </script>
+</body>
+</html>
